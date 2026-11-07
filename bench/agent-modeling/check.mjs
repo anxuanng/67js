@@ -201,7 +201,7 @@ function checkLitPainting(check, measures) {
   return { pass: problems.length === 0, detail: problems.join('; ') || `place ${placeIndex + 1}, ${shadowed} of ${total} points in shadow` };
 }
 
-function checkOne(check, measures) {
+export function checkOne(check, measures) {
   switch (check.kind) {
     case 'lint':
       return { pass: measures.lintProblems === 0 && measures.closedParts === measures.parts, detail: measures.lintProblems ? measures.problemKinds.join(', ') : `${measures.closedParts}/${measures.parts} parts closed` };

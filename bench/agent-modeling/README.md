@@ -394,3 +394,37 @@ Not run:
 ### Antigravity CLI (2026-11-07)
 
 `llms-only.mjs --agent agy --agy <agy executable> --model <model>` drives the Antigravity CLI, which offers Gemini 4 Argon, Gemini 3.8 Flash and GPT-OSS 120B. Headless mode denies every shell command, so the runner passes a session-only settings file (`--settings`, never saved) with one rule, `permissions.allow: ["command(*)"]`, and removes it after the run. The CLI cannot switch its web tools off, so the runner records any web tool call as `usedWeb` and fails it. Run `npm run build:lib` first: the pack skips scripts, and the runner stops when `build/` is missing. With 2 attempts per model (`results/2026-11-07-agy.json`): Gemini 4 Argon 2 of 2, Gemini 3.8 Flash 2 of 2, GPT-OSS 120B 0 of 2 (it searched the web in every attempt despite the prompt, then timed out waiting for the page). One Gemini 4 Argon PNG was 768 px, which the check accepts because it requires a minimum side only. The MCP suite is not run through this CLI: `agy` reads MCP servers only from its global config, and `--settings` rejects `mcpServers`.
+
+## Agent friendliness: 67js MCP against three.js by code (2026-11-07, issue #31)
+
+The three.js half of issue #31 and the 67js side of the same table. The Blender MCP half needs a VM and is not run. Model `sonnet`, headless `claude -p` on the subscription, 6 suite tasks (`crate`, `bolt`, `window`, `table`, `fence`, `bracket`), 1 run each per system, so 12 records in `results/2026-11-07-threejs-vs-67js.json`. Tokens and tool calls are reported; there is no API dollar figure.
+
+- 67js MCP: `run.mjs`, the task prompt behind the usual MCP preamble.
+- three.js: `threejs.mjs`, the same task text behind a different preamble. The agent gets an empty folder with `three` installed from npm, Bash, Read, Write, Edit, Glob and Grep, no web and no MCP. It writes `build.mjs`, which builds the object, writes `geometry.json` (world-space triangles per mesh) and renders `scene.png` with headless Chrome on SwiftShader.
+- Same grading: the task's own checks run on `geometry.json` (corners welded before the closed-surface, hole and loop counts; the grader passes the suite's reference geometry of all six tasks, see `tests/agent-threejs-grade.test.js`), and the look score is the suite's silhouette overlap from the three fixed cameras. A three.js run passes when every check passes and `scene.png` is a real picture.
+
+| System | Pass | Mean tool calls | Mean tokens (in+out) | Mean look | Mean wall seconds |
+| --- | --- | --- | --- | --- | --- |
+| 67js MCP | 6/6 | 3.2 | 375k | 0.932 | 24 |
+| three.js by code | 5/6 | 8.8 | 269k | 0.926 | 359 |
+
+| Task | System | Pass | Tool calls (errors) | Look | Failure |
+| --- | --- | --- | --- | --- | --- |
+| crate | 67js MCP | yes | 4 (0) | 1.000 | |
+| crate | three.js | yes | 9 (1) | 1.000 | |
+| bolt | 67js MCP | yes | 2 (0) | 1.000 | |
+| bolt | three.js | yes | 7 (3) | 0.964 | |
+| window | 67js MCP | yes | 4 (0) | 1.000 | |
+| window | three.js | no, 4/5 | 11 (0) | 1.000 | closed-surface check: the frame has open or doubled edges |
+| table | 67js MCP | yes | 2 (0) | 0.592 | |
+| table | three.js | yes | 8 (1) | 0.592 | |
+| fence | 67js MCP | yes | 2 (0) | 1.000 | |
+| fence | three.js | yes | 11 (1) | 1.000 | |
+| bracket | 67js MCP | yes | 5 (0) | 1.000 | |
+| bracket | three.js | yes | 7 (0) | 1.000 | |
+
+- Measured: 67js needed about a third of the tool calls and finished in about 24 s against about 6 minutes, most of the three.js time going to getting headless Chrome to write a PNG. Both systems built the same shapes: the look means are within noise, and `table` scores 0.592 for both, which points at the task's reference rather than at either system.
+- Tokens are not lower for 67js: inferred: the MCP tool schemas and server instructions are re-read on every call, so its input tokens are higher even with fewer calls. The three.js `table` run reports only 44k input tokens although it ran 871 s, so treat that one count as unreliable.
+- 67js failures: none in the checks. One harness fault: the `bracket` look images failed because the look page could not fetch the boolean wasm (`both async and sync fetching of the wasm failed`), which threw away the whole look record, silhouette included. The silhouette was scored again afterwards from the exported recipe, and the record carries `imagesError`. `scoreLook` should score the silhouette before it renders images.
+- A first attempt of the 67js run failed on every task because the checkout had no `build/mcp` folder (`npm run build:lib` creates it); those results were discarded. The first three.js run stopped after `bolt` when its process disappeared, so `window`, `table`, `fence` and `bracket` were run again as a second run and joined with `compare-threejs.mjs`.
+- Limits: 1 run per cell, one model, tasks the 67js suite was built around (they favour 67js's checks, not three.js). The `window` three.js failure label came from an earlier wording of the same check.
