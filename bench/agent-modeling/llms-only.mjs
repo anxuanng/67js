@@ -7,6 +7,7 @@
 // Each attempt gets a fresh folder with the package installed from a packed archive, a copy of public/llms.txt and
 // nothing else. The check opens scene.png and requires a real image with content (png-check.mjs).
 import { spawn, execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -41,6 +42,9 @@ const resultsDirectory = join(repository, 'bench', 'agent-modeling', 'results');
 const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function packArchive(destination) {
+  // The pack runs with --ignore-scripts, so prepack never builds: without build/ the archive has no library
+  // and the agent cannot import anything (found in the first valid agy run, 2026-11-07).
+  if (!existsSync(join(repository, 'build', '67.module.js'))) throw new Error('build/67.module.js is missing; run npm run build:lib first');
   const output = execFileSync(npmExecutable, ['pack', '--ignore-scripts', '--json', '--pack-destination', destination], { cwd: repository, encoding: 'utf8', shell: process.platform === 'win32' });
   const packed = JSON.parse(output);
   return join(destination, (Array.isArray(packed) ? packed[0] : Object.values(packed)[0]).filename);
@@ -63,18 +67,21 @@ function claudeArguments() {
   ];
 }
 
-function agyArguments() {
+// Headless agy auto-denies shell commands, so each run gets a session-only settings file with one allow rule.
+// --settings is never saved to agy's own config, and the run's own folder is the working directory.
+function agyArguments(settingsPath) {
   return [
     '-p', PROMPT,
     '--model', options.model,
+    '--settings', settingsPath,
     '--output-format', 'stream-json',
     '--print-timeout', `${options.timeout}s`,
   ];
 }
 
-function runAgent(workingDirectory) {
+function runAgent(workingDirectory, settingsPath) {
   const executable = options.agent === 'agy' ? options.agy : options.claude;
-  const argumentsList = options.agent === 'agy' ? agyArguments() : claudeArguments();
+  const argumentsList = options.agent === 'agy' ? agyArguments(settingsPath) : claudeArguments();
   return new Promise(resolvePromise => {
     const started = performance.now();
     const child = spawn(executable, argumentsList, { cwd: workingDirectory, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -168,7 +175,9 @@ async function runAttempt(archivePath, attempt) {
     await writeFile(join(workingDirectory, 'package.json'), JSON.stringify({ name: 'llms-only-task', private: true, type: 'module' }));
     execFileSync(npmExecutable, ['install', archivePath, '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: workingDirectory, stdio: 'ignore', shell: process.platform === 'win32' });
     await copyFile(join(repository, 'public', 'llms.txt'), join(workingDirectory, 'llms.txt'));
-    const run = await runAgent(workingDirectory);
+    const settingsPath = `${workingDirectory}-agy-settings.json`;
+    await writeFile(settingsPath, JSON.stringify({ permissions: { allow: ['command(*)'] } }));
+    const run = await runAgent(workingDirectory, settingsPath).finally(() => rm(settingsPath, { force: true }));
     const transcript = options.agent === 'agy' ? readAgyTranscript(run.output) : readTranscript(run.output);
     const pngGrade = await checkPng(join(workingDirectory, 'scene.png'));
     const grade = transcript.usedWeb ? { pass: false, detail: `used a web tool; ${pngGrade.detail}` } : pngGrade;
