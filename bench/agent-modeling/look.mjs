@@ -118,14 +118,19 @@ export async function renderLookImages(jobs) {
   });
 }
 
-/** The look record of one finished task: silhouette scores and the images they came from. Judges are added later. */
-export async function scoreLook(taskId, recipe, { imageDirectory } = {}) {
+/** The look record of one finished task: silhouette scores and the images they came from (or imagesError). Judges are added later. */
+export async function scoreLook(taskId, recipe, { imageDirectory, renderImages = renderLookImages } = {}) {
   const silhouette = await scoreSilhouette(taskId, recipe);
   if (!silhouette) return { skipped: 'asset recipes have no static silhouette' };
   const look = { silhouette };
   if (imageDirectory) {
-    const [images] = await renderLookImages([{ recipe, taskId, prefix: taskId, directory: imageDirectory }]);
-    look.images = images;
+    // The silhouette needs no picture, so a failed image step is recorded and the score is kept.
+    try {
+      const [images] = await renderImages([{ recipe, taskId, prefix: taskId, directory: imageDirectory }]);
+      look.images = images;
+    } catch (error) {
+      look.imagesError = error.message.split('\n')[0];
+    }
   }
   return look;
 }
