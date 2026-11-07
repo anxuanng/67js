@@ -130,6 +130,8 @@ Disposal is idempotent, and subsequent animation calls fail explicitly.
 The bridge supports triangle meshes, PNG/JPEG base color textures, rigid animations, and metallic-roughness material factors.
 It also supports `KHR_mesh_quantization` and `KHR_materials_emissive_strength`.
 
+Quantized positions load exactly as stored, so their precision is set when the file is packed. `gltfpack` merges a scene's meshes and puts the positions of all of them on one grid sized to the whole scene: with the default 14 bits, a 170 m street (the ORCA Bistro) gets a 9.7 cm step, and a scooter's wheels come out square. gltfpack warns about it ("position data has significant error"). Pack a large scene with `-vp 16` (about 1 cm there) or `-vpf` (float positions); both still compress with `-cc`.
+
 Alpha masking, alpha blending and double-sided materials import onto `alphaMode`, `alphaCutoff`, `opacity` and `doubleSided` (see the material maps guide). Vertex alpha is not drawn: an RGBA `COLOR_0` loads with its RGB, and `warnings` names the meshes whose alpha was below one and was dropped.
 It supports base-color, normal, metallic-roughness, occlusion and emissive texture channels.
 An optional extension that 67js does not read is ignored and named in `warnings`, as the glTF specification allows. An extension listed in `extensionsRequired` that 67js does not read still fails the load with `Unsupported glTF extension`.
