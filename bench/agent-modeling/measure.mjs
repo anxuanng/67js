@@ -59,7 +59,7 @@ const triangleArea = (positions, first, second, third) => {
   return Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx) / 2;
 };
 
-function signedVolume({ positions, indices }) {
+export function signedVolume({ positions, indices }) {
   let volume = 0;
   for (let triangle = 0; triangle < indices.length; triangle += 3) {
     const [first, second, third] = [indices[triangle], indices[triangle + 1], indices[triangle + 2]];
@@ -136,7 +136,7 @@ export function sectionLoops(geometries, axis, at) {
  * Count separate outer tips around the thinnest axis (gear teeth, star points). Vertices near the outer radius are
  * joined when a triangle edge runs between them along the rim, so a wide flat tooth tip still counts once.
  */
-function countTips(geometries, bounds) {
+export function countTips(geometries, bounds) {
   const extents = [0, 1, 2].map(axis => bounds.max[axis] - bounds.min[axis]);
   const thinAxis = extents.indexOf(Math.min(...extents));
   const [firstAxis, secondAxis] = [0, 1, 2].filter(axis => axis !== thinAxis);
@@ -199,7 +199,7 @@ function surfaceHeightAt({ positions, indices }, pointX, pointZ) {
   return null;
 }
 
-function lineHits(geometries, axis, point) {
+export function lineHits(geometries, axis, point) {
   const axisIndex = { x: 0, y: 1, z: 2 }[axis];
   const [firstAxis, secondAxis] = [0, 1, 2].filter(candidate => candidate !== axisIndex);
   let hits = 0;
